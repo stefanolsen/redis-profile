@@ -7,6 +7,9 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using RedisProfile.Services;
 
 namespace RedisProfile
 {
@@ -48,6 +51,19 @@ namespace RedisProfile
             }
 
             app.UseStaticFiles();
+
+            app.UseCookieAuthentication(new CookieAuthenticationOptions()
+            {
+                AuthenticationScheme = "Cookie"
+                LoginPath = new PathString("/Account/Unauthorized/"),
+                AccessDeniedPath = new PathString("/Account/Forbidden/"),
+                AutomaticAuthenticate = true,
+                AutomaticChallenge = true,
+                Events = new CookieAuthenticationEvents
+                {
+                    OnValidatePrincipal = CustomPrincipalValidator.ValidateAsync
+                }
+            });
 
             app.UseMvc(routes =>
             {
