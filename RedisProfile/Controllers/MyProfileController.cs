@@ -15,9 +15,12 @@ namespace RedisProfile.Controllers
         public async Task<IActionResult> Index()
         {
             var claimsPrincipal = HttpContext.User;
-            var userTokenString = claimsPrincipal.FindFirst("UserToken")?.Value;
 
+            // Find and parse the user token GUID from claim.
+            var userTokenString = claimsPrincipal.FindFirst("UserToken")?.Value;
             var userToken = Guid.Parse(userTokenString);
+
+            // Look up user data in Redis.
             var userData = await _customerDataService.GetProfileDataAsync(userToken);
 
             // TODO: Handle a situation where no data exists.

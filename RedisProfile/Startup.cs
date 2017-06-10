@@ -33,6 +33,7 @@ namespace RedisProfile
         {
             services.AddAuthorization(options =>
             {
+                // Add authorization rule for logged in users.
                 options.AddPolicy("LoggedInUser",
                     policy => policy.RequireAssertion(context =>
                         context.User.HasClaim(c =>
