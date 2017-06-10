@@ -25,20 +25,13 @@ namespace RedisProfile.Controllers
             }
 
             // Mocked: call a CRM system to verify that the user can be logged in.
-            bool loggedIn = true;
+            var crmService = new DummyCrmService();
+            bool loggedIn = crmService.Validate(model.UserName, model.Password);
 
             if (loggedIn)
             {
                 // Mocked: load user data from a CRM system.
-                var data = new BasicData
-                {
-                    UserId = 1210,
-                    FirstName = "Stefan",
-                    LastName = "Olsen",
-                    Email = "stefan@test.com",
-                    HasMarketingPermission = true,
-                    CreatedDate = new DateTime(2000, 1, 1)
-                };
+                var data = crmService.GetBasicData(model.UserName);
 
                 // Generate a random user token for this user session.
                 Guid userToken = Guid.NewGuid();
@@ -61,9 +54,9 @@ namespace RedisProfile.Controllers
                 var userPrincipal = new ClaimsPrincipal(userIdentity);
 
                 // Sign in the user.
-                await HttpContext.Authentication.SignInAsync("Cookie", userPrincipal);
+                await HttpContext.Authentication.SignInAsync("Cookies", userPrincipal);
 
-                return RedirectToAction("Index", "Home");
+                return RedirectToAction("Index", "MyProfile");
             }
 
             ModelState.AddModelError("", "Invalid login!");
@@ -85,7 +78,7 @@ namespace RedisProfile.Controllers
             }
 
             // Sign out the user.
-            await HttpContext.Authentication.SignOutAsync("Cookie");
+            await HttpContext.Authentication.SignOutAsync("Cookies");
 
             return RedirectToAction("Login", "Account");
         }

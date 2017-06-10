@@ -17,7 +17,7 @@ namespace RedisProfile.Services
             {
                 // If the principal does not contain a user token, sign out the user.
                 context.RejectPrincipal();
-                await context.HttpContext.Authentication.SignOutAsync("Cookie");
+                await context.HttpContext.Authentication.SignOutAsync("Cookies");
                 return;
             }
 
@@ -29,7 +29,7 @@ namespace RedisProfile.Services
             {
                 // If the principal does not exist or is expired in Redis, sign out the user.
                 context.RejectPrincipal();
-                await context.HttpContext.Authentication.SignOutAsync("Cookie");
+                await context.HttpContext.Authentication.SignOutAsync("Cookies");
             }
         }
     }
