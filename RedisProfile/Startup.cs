@@ -10,6 +10,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using RedisProfile.Services;
+using RedisProfile.ViewModels;
 
 namespace RedisProfile
 {
@@ -30,6 +31,15 @@ namespace RedisProfile
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
+            services.AddAuthorization(options =>
+            {
+                options.AddPolicy("LoggedInUser",
+                    policy => policy.RequireAssertion(context =>
+                        context.User.HasClaim(c =>
+                            c.Type == "UserToken" &&
+                            c.Issuer == "http://testsite.local")));
+            });
+
             // Add framework services.
             services.AddMvc();
         }
@@ -54,7 +64,7 @@ namespace RedisProfile
 
             app.UseCookieAuthentication(new CookieAuthenticationOptions()
             {
-                AuthenticationScheme = "Cookie",
+                AuthenticationScheme = CookieAuthenticationDefaults.AuthenticationScheme,
                 LoginPath = new PathString("/Account/Unauthorized/"),
                 AccessDeniedPath = new PathString("/Account/Forbidden/"),
                 AutomaticAuthenticate = true,

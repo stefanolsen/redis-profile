@@ -1,0 +1,25 @@
+﻿@model RedisProfile.Services.BasicData
+@{
+    ViewData["Title"] = "My Profile";
+}
+
+<h1>My Profile</h1>
+<dl>
+    <dt>User Id</dt>
+    <dd>@Model.UserId</dd>
+
+    <dt>First Name</dt>
+    <dd>@Model.FirstName</dd>
+
+    <dt>Last Name</dt>
+    <dd>@Model.LastName</dd>
+
+    <dt>Email</dt>
+    <dd>@Model.Email</dd>
+
+    <dt>Has Marketing Permission?</dt>
+    <dd>@Model.HasMarketingPermission</dd>
+
+    <dt>Created Date</dt>
+    <dd>@Model.CreatedDate</dd>
+</dl>
