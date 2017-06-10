@@ -62,6 +62,35 @@ namespace RedisProfile.Services
             }
         }
 
+        public async Task<BasicData> GetProfileDataAsync(Guid userToken)
+        {
+            using (var connection = await GetConnection())
+            {
+                var database = connection.GetDatabase();
+
+                // Try to look up the user id by the user token.
+                long? userId = await GetUserId(database, userToken);
+                if (!userId.HasValue)
+                {
+                    return null;
+                }
+
+                // Generate a specific key for the user's profile hash.
+                string profileKey = string.Format(ProfileKeyFormat, userId);
+
+                // Get the profile hash entries for the user token.
+                var hashes = await database.HashGetAllAsync(profileKey);
+
+                // Reset the key TTL (expiration), for sliding expiration like in regular session state.
+                await database.KeyExpireAsync(profileKey, DefaultDataExpiryMinutes);
+
+                // Convert the Redis hash entries into properties on a BasicData instance.
+                var data = hashes.ConvertFromRedis<BasicData>();
+
+                return data;
+            }
+        }
+
         /// <summary>
         /// Stores the user token <-> user id relation.
         /// </summary>
@@ -105,7 +134,6 @@ namespace RedisProfile.Services
                 string profileKey = string.Format(ProfileKeyFormat, userId);
 
                 // Store the hash entries and set a TTL (expiration) on the key.
-                // If the data is null, the website should reload the data from the source.
                 await database.HashSetAsync(profileKey, hashes);
                 await database.KeyExpireAsync(profileKey, DefaultDataExpiryMinutes);
             }
