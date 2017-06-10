@@ -40,12 +40,18 @@ namespace RedisProfile.Controllers
                     CreatedDate = new DateTime(2000, 1, 1)
                 };
 
+                // Generate a random user token for this user session.
                 Guid userToken = Guid.NewGuid();
 
                 var customerDataService = new CustomerDataService();
+
+                // Store the user token - user id relation in Redis.
                 await customerDataService.StoreUserToken(userToken, data.UserId);
+
+                // Store the user data in Redis.
                 await customerDataService.StoreProfileDataAsync(userToken, data);
 
+                // Store the user token as an identity claim.
                 var claims = new List<Claim>
                 {
                     new Claim("UserToken", userToken.ToString("N"), ClaimValueTypes.String, "http://testsite.local")
@@ -54,6 +60,7 @@ namespace RedisProfile.Controllers
                 var userIdentity = new ClaimsIdentity(claims);
                 var userPrincipal = new ClaimsPrincipal(userIdentity);
 
+                // Sign in the user.
                 await HttpContext.Authentication.SignInAsync("Cookie", userPrincipal);
 
                 return RedirectToAction("Index", "Home");
@@ -66,6 +73,7 @@ namespace RedisProfile.Controllers
 
         public async Task<IActionResult> LogOff()
         {
+            // Try to clean up data in Redis, if possible.
             var claimsPrincipal = HttpContext.User;
             var userTokenString = claimsPrincipal.FindFirst("UserToken")?.Value;
             if (!string.IsNullOrWhiteSpace(userTokenString))
@@ -76,6 +84,7 @@ namespace RedisProfile.Controllers
                 await customerDataService.DeleteUserDataAsync(userToken);
             }
 
+            // Sign out the user.
             await HttpContext.Authentication.SignOutAsync("Cookie");
 
             return RedirectToAction("Login", "Account");

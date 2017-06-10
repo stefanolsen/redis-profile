@@ -9,29 +9,25 @@ namespace RedisProfile.Services
     {
         public static async Task ValidateAsync(CookieValidatePrincipalContext context)
         {
-            // Pull database from registered DI services.
             var customerDataService = new CustomerDataService();
             var userPrincipal = context.Principal;
 
             var userTokenString = userPrincipal.FindFirst("UserToken")?.Value;
-            //var userIdString = userPrincipal.FindFirst("UserId")?.Value;
-
-            //if (string.IsNullOrWhiteSpace(userIdString) ||
-            //    string.IsNullOrWhiteSpace(userTokenString))
             if (string.IsNullOrWhiteSpace(userTokenString))
             {
+                // If the principal does not contain a user token, sign out the user.
                 context.RejectPrincipal();
                 await context.HttpContext.Authentication.SignOutAsync("Cookie");
                 return;
             }
 
-            //var userId = int.Parse(userIdString);
+            // Validate that the user token (still) exists in Redis.
             var userToken = Guid.Parse(userTokenString);
-
             bool profileExists = await customerDataService.ValidateUserTokenExistsAsync(userToken);
 
             if (!profileExists)
             {
+                // If the principal does not exist or is expired in Redis, sign out the user.
                 context.RejectPrincipal();
                 await context.HttpContext.Authentication.SignOutAsync("Cookie");
             }

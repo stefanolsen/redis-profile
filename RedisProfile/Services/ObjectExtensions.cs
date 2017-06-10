@@ -7,6 +7,10 @@ namespace RedisProfile.Services
 {
     public static class ObjectExtensions
     {
+        /// <summary>
+        /// Converts a simple object to a list of Redis Hash entries.
+        /// All object properties is casted to strings that can be stored in Redis.
+        /// </summary>
         public static HashEntry[] ToHashEntries(this object obj)
         {
             PropertyInfo[] properties = obj.GetType().GetProperties();
@@ -19,6 +23,9 @@ namespace RedisProfile.Services
             return entries;
         }
 
+        /// <summary>
+        /// Instantiates an object of T, by matching a list of hash entries to the object properties.
+        /// </summary>
         public static T ConvertFromRedis<T>(this HashEntry[] hashEntries)
         {
             PropertyInfo[] properties = typeof(T).GetProperties();
