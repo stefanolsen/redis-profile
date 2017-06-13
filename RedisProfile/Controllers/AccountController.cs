@@ -42,7 +42,7 @@ namespace RedisProfile.Controllers
                 await customerDataService.StoreUserToken(userToken, data.UserId);
 
                 // Store the user data in Redis.
-                await customerDataService.StoreProfileDataAsync(userToken, data);
+                await customerDataService.StoreBasicDataAsync(userToken, data);
 
                 // Store the user token as an identity claim.
                 var claims = new List<Claim>

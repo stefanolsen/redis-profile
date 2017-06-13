@@ -6,11 +6,11 @@ namespace RedisProfile.Services
 {
     public class CustomerDataService
     {
-        private static TimeSpan DefaultTokenExpiryMinutes = TimeSpan.FromMinutes(5);
-        private static TimeSpan DefaultDataExpiryMinutes = TimeSpan.FromMinutes(120);
+        private static readonly TimeSpan DefaultTokenExpiryMinutes = TimeSpan.FromMinutes(5);
+        private static readonly TimeSpan DefaultDataExpiryMinutes = TimeSpan.FromMinutes(120);
 
         private const string UserTokenKeyFormat = "tokens:{0}";
-        private const string ProfileKeyFormat = "profiles:{0}";
+        private const string BasicDataKeyFormat = "profiles:{0}";
 
         /// <summary>
         /// Validates that the user token exists and refreshes the user token TTL.
@@ -54,15 +54,15 @@ namespace RedisProfile.Services
                 string tokenKey = string.Format(UserTokenKeyFormat, tokenString);
 
                 // Generate a specific key for the user's profile hash.
-                string profileKey = string.Format(ProfileKeyFormat, userId);
+                string basicDataKey = string.Format(BasicDataKeyFormat, userId);
 
                 // Delete the entries from Redis.
                 await database.KeyDeleteAsync(tokenKey, CommandFlags.DemandMaster | CommandFlags.FireAndForget);
-                await database.KeyDeleteAsync(profileKey, CommandFlags.FireAndForget);
+                await database.KeyDeleteAsync(basicDataKey, CommandFlags.FireAndForget);
             }
         }
 
-        public async Task<BasicData> GetProfileDataAsync(Guid userToken)
+        public async Task<BasicData> GetBasicDataAsync(Guid userToken)
         {
             using (var connection = await GetConnection())
             {
@@ -76,13 +76,13 @@ namespace RedisProfile.Services
                 }
 
                 // Generate a specific key for the user's profile hash.
-                string profileKey = string.Format(ProfileKeyFormat, userId);
+                string basicDataKey = string.Format(BasicDataKeyFormat, userId);
 
                 // Get the profile hash entries for the user token.
-                var hashes = await database.HashGetAllAsync(profileKey);
+                var hashes = await database.HashGetAllAsync(basicDataKey);
 
                 // Reset the key TTL (expiration), for sliding expiration like in regular session state.
-                await database.KeyExpireAsync(profileKey, DefaultDataExpiryMinutes);
+                await database.KeyExpireAsync(basicDataKey, DefaultDataExpiryMinutes);
 
                 // Convert the Redis hash entries into properties on a BasicData instance.
                 var data = hashes.ConvertFromRedis<BasicData>();
@@ -92,7 +92,7 @@ namespace RedisProfile.Services
         }
 
         /// <summary>
-        /// Stores the user token <-> user id relation.
+        /// Stores the user token - user id relation.
         /// </summary>
         public async Task StoreUserToken(Guid userToken, long userId)
         {
@@ -114,7 +114,7 @@ namespace RedisProfile.Services
         /// <summary>
         /// Tries to store an instance of BasicData for a user, identified by a user token.
         /// </summary>
-        public async Task StoreProfileDataAsync(Guid userToken, BasicData data)
+        public async Task StoreBasicDataAsync(Guid userToken, BasicData data)
         {
             using (var connection = await GetConnection())
             {
@@ -131,18 +131,18 @@ namespace RedisProfile.Services
                 var hashes = data.ToHashEntries();
 
                 // Generate a specific key for the user's profile hash.
-                string profileKey = string.Format(ProfileKeyFormat, userId);
+                string basicDataKey = string.Format(BasicDataKeyFormat, userId);
 
                 // Store the hash entries and set a TTL (expiration) on the key.
-                await database.HashSetAsync(profileKey, hashes);
-                await database.KeyExpireAsync(profileKey, DefaultDataExpiryMinutes);
+                await database.HashSetAsync(basicDataKey, hashes);
+                await database.KeyExpireAsync(basicDataKey, DefaultDataExpiryMinutes);
             }
         }
 
         /// <summary>
         /// Tries to look up a user id given a user token GUID. If specified, it also refreshes the current TTL.
         /// </summary>
-        private async Task<long?> GetUserId(IDatabase database, Guid userToken, bool refreshTtl = false)
+        private static async Task<long?> GetUserId(IDatabaseAsync database, Guid userToken, bool refreshTtl = false)
         {
             string tokenString = userToken.ToString("N");
             string tokenKey = string.Format(UserTokenKeyFormat, tokenString);
@@ -152,22 +152,22 @@ namespace RedisProfile.Services
             RedisValue idValue = await database.StringGetAsync(tokenKey);
 
             bool exists = !idValue.IsNullOrEmpty;
-            if (exists)
+            if (!exists)
             {
-                if (refreshTtl)
-                {
-                    // If the user exists and the caller requests so, reset the key TTL (expiration).
-                    // This make sliding expiration work like in regular session state.
-                    await database.KeyExpireAsync(tokenKey, DefaultTokenExpiryMinutes, CommandFlags.FireAndForget);
-                }
-
-                return (long)idValue;
+                return null;
             }
 
-            return null;
+            if (refreshTtl)
+            {
+                // If the user exists and the caller requests so, reset the key TTL (expiration).
+                // This make sliding expiration work like in regular session state.
+                await database.KeyExpireAsync(tokenKey, DefaultTokenExpiryMinutes, CommandFlags.FireAndForget);
+            }
+
+            return (long)idValue;
         }
 
-        private async static Task<ConnectionMultiplexer> GetConnection()
+        private static async Task<ConnectionMultiplexer> GetConnection()
         {
             return await ConnectionMultiplexer.ConnectAsync("localhost");
         }

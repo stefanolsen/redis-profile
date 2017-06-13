@@ -10,7 +10,6 @@ namespace RedisProfile.Controllers
     public class MyProfileController : Controller
     {
         private readonly CustomerDataService _customerDataService = new CustomerDataService();
-        private readonly DummyCrmService _crmService = new DummyCrmService();
 
         public async Task<IActionResult> Index()
         {
@@ -21,10 +20,10 @@ namespace RedisProfile.Controllers
             var userToken = Guid.Parse(userTokenString);
 
             // Look up user data in Redis.
-            var userData = await _customerDataService.GetProfileDataAsync(userToken);
+            var basicData = await _customerDataService.GetBasicDataAsync(userToken);
 
             // TODO: Handle a situation where no data exists.
-            return View(userData);
+            return View(basicData);
         }
     }
 }
