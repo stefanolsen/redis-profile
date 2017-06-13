@@ -16,7 +16,7 @@ namespace RedisProfile.Services
             PropertyInfo[] properties = obj.GetType().GetProperties();
 
             var entries = properties
-                .Where(x => x.GetValue(obj) != null)
+                .Where(x => IsSupportedType(x.PropertyType) && x.GetValue(obj) != null)
                 .Select(property => new HashEntry(property.Name, property.GetValue(obj)
                     .ToString())).ToArray();
 
@@ -34,7 +34,7 @@ namespace RedisProfile.Services
             foreach (var property in properties)
             {
                 HashEntry entry = hashEntries.FirstOrDefault(g => g.Name.ToString().Equals(property.Name));
-                if (entry == null)
+                if (entry.Value.IsNull)
                 {
                     continue;
                 }
@@ -43,6 +43,15 @@ namespace RedisProfile.Services
             }
 
             return (T)obj;
+        }
+
+        private static bool IsSupportedType(Type type)
+        {
+            var typeInfo = type.GetTypeInfo();
+
+            // Primitive types, structs or strings are supported.
+            // Classes are not. They will need to be stored as separate hashes.
+            return typeInfo.IsPrimitive || typeInfo.IsValueType || type == typeof(string);
         }
     }
 }
