@@ -31,7 +31,8 @@ namespace RedisProfile.Controllers
             if (loggedIn)
             {
                 // Mocked: load user data from a CRM system.
-                var data = crmService.GetBasicData(model.UserName);
+                var basicData = crmService.GetBasicData(model.UserName);
+                var supportInquiries = crmService.GetSupportInquiries(model.UserName);
 
                 // Generate a random user token for this user session.
                 Guid userToken = Guid.NewGuid();
@@ -39,10 +40,11 @@ namespace RedisProfile.Controllers
                 var customerDataService = new CustomerDataService();
 
                 // Store the user token - user id relation in Redis.
-                await customerDataService.StoreUserToken(userToken, data.UserId);
+                await customerDataService.StoreUserToken(userToken, basicData.UserId);
 
                 // Store the user data in Redis.
-                await customerDataService.StoreBasicDataAsync(userToken, data);
+                await customerDataService.StoreBasicDataAsync(userToken, basicData);
+                await customerDataService.StoreSupportInquiriesDataAsync(userToken, supportInquiries);
 
                 // Store the user token as an identity claim.
                 var claims = new List<Claim>

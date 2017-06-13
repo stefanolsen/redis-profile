@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using StackExchange.Redis;
 using System.Threading.Tasks;
 
@@ -10,7 +11,9 @@ namespace RedisProfile.Services
         private static readonly TimeSpan DefaultDataExpiryMinutes = TimeSpan.FromMinutes(120);
 
         private const string UserTokenKeyFormat = "tokens:{0}";
-        private const string BasicDataKeyFormat = "profiles:{0}";
+        private const string BasicDataKeyFormat = "basicdata:{0}";
+        private const string SupportInquiriesKeyFormat = "supportinquiries:{0}";
+        private const string SupportInquiryKeyFormat = "supportinquiry:{0}";
 
         /// <summary>
         /// Validates that the user token exists and refreshes the user token TTL.
@@ -62,6 +65,9 @@ namespace RedisProfile.Services
             }
         }
 
+        /// <summary>
+        /// Tries to get the basic data of a specific user.
+        /// </summary>
         public async Task<BasicData> GetBasicDataAsync(Guid userToken)
         {
             using (var connection = await GetConnection())
@@ -88,6 +94,57 @@ namespace RedisProfile.Services
                 var data = hashes.ConvertFromRedis<BasicData>();
 
                 return data;
+            }
+        }
+
+        /// <summary>
+        /// Tries to get a collection of support inquiries related of a specific user.
+        /// </summary>
+        public async Task<ICollection<SupportInquiry>> GetSupportInquiriesAsync(Guid userToken, int offset, int count)
+        {
+            using (var connection = await GetConnection())
+            {
+                var database = connection.GetDatabase();
+
+                // Try to look up the user id by the user token.
+                long? userId = await GetUserId(database, userToken);
+                if (!userId.HasValue)
+                {
+                    return null;
+                }
+
+                // Generate a specific key for the user's inquiry list.
+                string inquiriesListKey = string.Format(SupportInquiriesKeyFormat, userId);
+
+                // Reset the key TTL (expiration), for sliding expiration like in regular session state.
+                await database.KeyExpireAsync(inquiriesListKey, DefaultDataExpiryMinutes);
+
+                // Get the id's of all inquiries for the user token.
+                RedisValue[] redisValues = database.ListRange(inquiriesListKey, offset, offset + count);
+                if (redisValues == null)
+                {
+                    return null;
+                }
+
+                var inquiries = new List<SupportInquiry>();
+
+                foreach (var redisValue in redisValues)
+                {
+                    long inquiryId = (long)redisValue;
+
+                    // Generate a specific key for the inquiry hash.
+                    string inquiryDataKey = string.Format(SupportInquiryKeyFormat, inquiryId);
+
+                    // Get the inquiry hash entries for the inquiry id.
+                    var hashes = await database.HashGetAllAsync(inquiryDataKey);
+
+                    // Convert the Redis hash entries into properties on a SupportInquiry instance.
+                    var inquiry = hashes.ConvertFromRedis<SupportInquiry>();
+
+                    inquiries.Add(inquiry);
+                }
+
+                return inquiries;
             }
         }
 
@@ -127,7 +184,7 @@ namespace RedisProfile.Services
                     return;
                 }
 
-                // Convert the data object properties to Redis hash entries.
+                // Convert basic data properties to Redis hash entries.
                 var hashes = data.ToHashEntries();
 
                 // Generate a specific key for the user's profile hash.
@@ -136,6 +193,48 @@ namespace RedisProfile.Services
                 // Store the hash entries and set a TTL (expiration) on the key.
                 await database.HashSetAsync(basicDataKey, hashes);
                 await database.KeyExpireAsync(basicDataKey, DefaultDataExpiryMinutes);
+            }
+        }
+
+        /// <summary>
+        /// Tries to store a collction of SupportInquiry instances, identified by a user token.
+        /// </summary>
+        public async Task StoreSupportInquiriesDataAsync(Guid userToken, ICollection<SupportInquiry> inquiries)
+        {
+            using (var connection = await GetConnection())
+            {
+                var database = connection.GetDatabase();
+
+                // Try to look up the user id by the user token.
+                long? userId = await GetUserId(database, userToken);
+                if (!userId.HasValue)
+                {
+                    return;
+                }
+
+                // Generate a specific key for the user's inquiry list.
+                string inquiriesListKey = string.Format(SupportInquiriesKeyFormat, userId);
+
+                // Remove a potential existing list key and its values (to avoid duplicates).
+                await database.KeyDeleteAsync(inquiriesListKey);
+
+                foreach (var inquiry in inquiries)
+                {
+                    // Convert inquiry properties to Redis hash entries.
+                    var hashes = inquiry.ToHashEntries();
+
+                    // Generate a specific key for the inquiry hash.
+                    string inquiryDataKey = string.Format(SupportInquiryKeyFormat, inquiry.Id);
+                    
+                    // Store the hash entries and set a TTL (expiration) on the key.
+                    await database.HashSetAsync(inquiryDataKey, hashes);
+
+                    // Store the ID of this inquiry in a list of inquiry IDs.
+                    await database.ListRightPushAsync(inquiriesListKey, inquiry.Id);
+                }
+
+                // Set a TTL (expiration) on the list key.
+                await database.KeyExpireAsync(inquiriesListKey, DefaultDataExpiryMinutes);
             }
         }
 

@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using RedisProfile.Services;
+using RedisProfile.ViewModels;
 
 namespace RedisProfile.Controllers
 {
@@ -16,14 +17,20 @@ namespace RedisProfile.Controllers
             var claimsPrincipal = HttpContext.User;
 
             // Find and parse the user token GUID from claim.
+            // TODO: This could be abstracted away, for instance to a base controller or a helper class.
             var userTokenString = claimsPrincipal.FindFirst("UserToken")?.Value;
             var userToken = Guid.Parse(userTokenString);
 
-            // Look up user data in Redis.
-            var basicData = await _customerDataService.GetBasicDataAsync(userToken);
+
+            // Instantiate a view model with data from Redis.
+            var viewModel = new MyProfileIndexViewModel
+            {
+                BasicData = await _customerDataService.GetBasicDataAsync(userToken),
+                SupportInquiries = await _customerDataService.GetSupportInquiriesAsync(userToken, 0, 20)
+            };
 
             // TODO: Handle a situation where no data exists.
-            return View(basicData);
+            return View(viewModel);
         }
     }
 }
